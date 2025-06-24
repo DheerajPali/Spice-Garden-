@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { WishlistItem, MenuItem, WishlistContextType } from '../types';
+import { useAuth } from './AuthContext';
 
 const WishlistContext = createContext<WishlistContextType | undefined>(undefined);
 
@@ -12,31 +13,45 @@ export const useWishlist = () => {
 };
 
 export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [items, setItems] = useState<WishlistItem[]>([]);
+  const [allWishlists, setAllWishlists] = useState<Record<string, WishlistItem[]>>({});
+  const { user } = useAuth();
 
   useEffect(() => {
-    const savedWishlist = localStorage.getItem('wishlist');
-    if (savedWishlist) {
-      setItems(JSON.parse(savedWishlist));
+    const savedWishlists = localStorage.getItem('wishlists');
+    if (savedWishlists) {
+      setAllWishlists(JSON.parse(savedWishlists));
     }
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('wishlist', JSON.stringify(items));
-  }, [items]);
+    localStorage.setItem('wishlists', JSON.stringify(allWishlists));
+  }, [allWishlists]);
+
+  const getUserId = () => user?.id || 'guest';
+
+  const items = allWishlists[getUserId()] || [];
 
   const addItem = (item: MenuItem) => {
-    setItems(prevItems => {
-      const existingItem = prevItems.find(wishlistItem => wishlistItem.id === item.id);
+    const userId = getUserId();
+    setAllWishlists(prev => {
+      const userWishlist = prev[userId] || [];
+      const existingItem = userWishlist.find(wishlistItem => wishlistItem.id === item.id);
       if (existingItem) {
-        return prevItems;
+        return prev;
       }
-      return [...prevItems, item];
+      return {
+        ...prev,
+        [userId]: [...userWishlist, item]
+      };
     });
   };
 
   const removeItem = (itemId: string) => {
-    setItems(prevItems => prevItems.filter(item => item.id !== itemId));
+    const userId = getUserId();
+    setAllWishlists(prev => ({
+      ...prev,
+      [userId]: (prev[userId] || []).filter(item => item.id !== itemId)
+    }));
   };
 
   const isInWishlist = (itemId: string): boolean => {
@@ -44,7 +59,11 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const clearWishlist = () => {
-    setItems([]);
+    const userId = getUserId();
+    setAllWishlists(prev => ({
+      ...prev,
+      [userId]: []
+    }));
   };
 
   return (

@@ -127,7 +127,7 @@ export interface RestaurantSettings {
   };
 }
 
-export interface Notification {
+export interface AppNotification {
   id: string;
   type: 'order_placed' | 'order_updated' | 'order_delivered' | 'new_order';
   title: string;

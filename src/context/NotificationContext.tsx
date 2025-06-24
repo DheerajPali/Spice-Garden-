@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Notification } from '../../src/types/index.ts';
+import { AppNotification } from '../types/index';
 import { useAuth } from './AuthContext';
 
 interface NotificationContextType {
-  notifications: Notification[];
-  addNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => void;
+  notifications: AppNotification[];
+  addNotification: (notification: Omit<AppNotification, 'id' | 'timestamp' | 'read'>) => void;
   markAsRead: (notificationId: string) => void;
   markAllAsRead: () => void;
   unreadCount: number;
@@ -22,13 +22,13 @@ export const useNotifications = () => {
 };
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [allNotifications, setAllNotifications] = useState<AppNotification[]>([]);
   const { user } = useAuth();
 
   useEffect(() => {
     const savedNotifications = localStorage.getItem('notifications');
     if (savedNotifications) {
-      setNotifications(JSON.parse(savedNotifications).map((n: any) => ({
+      setAllNotifications(JSON.parse(savedNotifications).map((n: any) => ({
         ...n,
         timestamp: new Date(n.timestamp)
       })));
@@ -36,18 +36,18 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('notifications', JSON.stringify(notifications));
-  }, [notifications]);
+    localStorage.setItem('notifications', JSON.stringify(allNotifications));
+  }, [allNotifications]);
 
-  const addNotification = (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
-    const newNotification: Notification = {
+  const addNotification = (notification: Omit<AppNotification, 'id' | 'timestamp' | 'read'>) => {
+    const newNotification: AppNotification = {
       ...notification,
       id: Date.now().toString(),
       timestamp: new Date(),
       read: false
     };
 
-    setNotifications(prev => [newNotification, ...prev]);
+    setAllNotifications(prev => [newNotification, ...prev]);
 
     // Show browser notification if permission granted
     if ('Notification' in window && Notification.permission === 'granted') {
@@ -59,7 +59,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   };
 
   const markAsRead = (notificationId: string) => {
-    setNotifications(prev =>
+    setAllNotifications(prev =>
       prev.map(notification =>
         notification.id === notificationId
           ? { ...notification, read: true }
@@ -69,17 +69,24 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   };
 
   const markAllAsRead = () => {
-    setNotifications(prev =>
-      prev.map(notification => ({ ...notification, read: true }))
+    setAllNotifications(prev =>
+      prev.map(notification => {
+        // Only mark as read if it's for the current user
+        const isForCurrentUser = user?.isAdmin 
+          ? notification.isForAdmin || notification.userId === user.id
+          : !notification.isForAdmin && (!notification.userId || notification.userId === user?.id);
+        
+        return isForCurrentUser ? { ...notification, read: true } : notification;
+      })
     );
   };
 
   const clearNotifications = () => {
-    setNotifications([]);
+    setAllNotifications([]);
   };
 
-  // Filter notifications based on user role
-  const filteredNotifications = notifications.filter(notification => {
+  // Filter notifications based on user role and user ID
+  const filteredNotifications = allNotifications.filter(notification => {
     if (user?.isAdmin) {
       return notification.isForAdmin || notification.userId === user.id;
     } else {

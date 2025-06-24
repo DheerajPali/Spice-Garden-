@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { CartItem, MenuItem, CartContextType } from '../types';
+import { useAuth } from './AuthContext';
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
@@ -12,35 +13,54 @@ export const useCart = () => {
 };
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [items, setItems] = useState<CartItem[]>([]);
+  const [allCarts, setAllCarts] = useState<Record<string, CartItem[]>>({});
+  const { user } = useAuth();
 
   useEffect(() => {
-    const savedCart = localStorage.getItem('cart');
-    if (savedCart) {
-      setItems(JSON.parse(savedCart));
+    const savedCarts = localStorage.getItem('carts');
+    if (savedCarts) {
+      setAllCarts(JSON.parse(savedCarts));
     }
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('cart', JSON.stringify(items));
-  }, [items]);
+    localStorage.setItem('carts', JSON.stringify(allCarts));
+  }, [allCarts]);
+
+  const getUserId = () => user?.id || 'guest';
+
+  const items = allCarts[getUserId()] || [];
 
   const addItem = (item: MenuItem, quantity: number = 1) => {
-    setItems(prevItems => {
-      const existingItem = prevItems.find(cartItem => cartItem.id === item.id);
+    const userId = getUserId();
+    setAllCarts(prevCarts => {
+      const userCart = prevCarts[userId] || [];
+      const existingItem = userCart.find(cartItem => cartItem.id === item.id);
+      
       if (existingItem) {
-        return prevItems.map(cartItem =>
-          cartItem.id === item.id
-            ? { ...cartItem, quantity: cartItem.quantity + quantity }
-            : cartItem
-        );
+        return {
+          ...prevCarts,
+          [userId]: userCart.map(cartItem =>
+            cartItem.id === item.id
+              ? { ...cartItem, quantity: cartItem.quantity + quantity }
+              : cartItem
+          )
+        };
       }
-      return [...prevItems, { ...item, quantity }];
+      
+      return {
+        ...prevCarts,
+        [userId]: [...userCart, { ...item, quantity }]
+      };
     });
   };
 
   const removeItem = (itemId: string) => {
-    setItems(prevItems => prevItems.filter(item => item.id !== itemId));
+    const userId = getUserId();
+    setAllCarts(prevCarts => ({
+      ...prevCarts,
+      [userId]: (prevCarts[userId] || []).filter(item => item.id !== itemId)
+    }));
   };
 
   const updateQuantity = (itemId: string, quantity: number) => {
@@ -48,15 +68,22 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       removeItem(itemId);
       return;
     }
-    setItems(prevItems =>
-      prevItems.map(item =>
+    
+    const userId = getUserId();
+    setAllCarts(prevCarts => ({
+      ...prevCarts,
+      [userId]: (prevCarts[userId] || []).map(item =>
         item.id === itemId ? { ...item, quantity } : item
       )
-    );
+    }));
   };
 
   const clearCart = () => {
-    setItems([]);
+    const userId = getUserId();
+    setAllCarts(prevCarts => ({
+      ...prevCarts,
+      [userId]: []
+    }));
   };
 
   const getItemQuantity = (itemId: string): number => {

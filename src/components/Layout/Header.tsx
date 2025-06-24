@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { ShoppingCart, User, Menu, X, LogOut, Settings, Bell, Users, Heart } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
@@ -16,6 +16,29 @@ const Header: React.FC = () => {
   const { items: wishlistItems } = useWishlist();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Refs for click outside detection
+  const notificationRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setIsNotificationOpen(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
+        setIsProfileSwitchOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -39,9 +62,20 @@ const Header: React.FC = () => {
   const handleNotificationClick = (notification: any) => {
     markAsRead(notification.id);
     if (notification.orderId) {
-      navigate(`/orders`);
+      if (user?.isAdmin) {
+        navigate('/admin/orders');
+      } else {
+        navigate('/orders');
+      }
     }
     setIsNotificationOpen(false);
+  };
+
+  const isActiveRoute = (path: string) => {
+    if (path === '/') {
+      return location.pathname === '/';
+    }
+    return location.pathname.startsWith(path);
   };
 
   return (
@@ -58,14 +92,35 @@ const Header: React.FC = () => {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
-            <Link to="/" className="text-gray-700 hover:text-orange-500 transition-colors">
+            <Link 
+              to="/" 
+              className={`transition-colors ${
+                isActiveRoute('/') && !isActiveRoute('/admin')
+                  ? 'text-orange-500 font-medium' 
+                  : 'text-gray-700 hover:text-orange-500'
+              }`}
+            >
               Menu
             </Link>
-            <Link to="/orders" className="text-gray-700 hover:text-orange-500 transition-colors">
+            <Link 
+              to="/orders" 
+              className={`transition-colors ${
+                isActiveRoute('/orders') 
+                  ? 'text-orange-500 font-medium' 
+                  : 'text-gray-700 hover:text-orange-500'
+              }`}
+            >
               My Orders
             </Link>
             {user?.isAdmin && (
-              <Link to="/admin" className="text-gray-700 hover:text-orange-500 transition-colors">
+              <Link 
+                to="/admin" 
+                className={`transition-colors ${
+                  isActiveRoute('/admin') 
+                    ? 'text-orange-500 font-medium' 
+                    : 'text-gray-700 hover:text-orange-500'
+                }`}
+              >
                 Admin Panel
               </Link>
             )}
@@ -74,7 +129,7 @@ const Header: React.FC = () => {
           {/* Right Side Icons */}
           <div className="flex items-center space-x-4">
             {/* Notifications */}
-            <div className="relative">
+            <div className="relative" ref={notificationRef}>
               <button 
                 onClick={() => setIsNotificationOpen(!isNotificationOpen)}
                 className="relative p-2 text-gray-700 hover:text-orange-500 transition-colors"
@@ -164,7 +219,7 @@ const Header: React.FC = () => {
             </Link>
 
             {/* User Menu */}
-            <div className="relative">
+            <div className="relative" ref={userMenuRef}>
               {user ? (
                 <div>
                   <button
@@ -252,21 +307,33 @@ const Header: React.FC = () => {
             <nav className="flex flex-col space-y-4">
               <Link
                 to="/"
-                className="text-gray-700 hover:text-orange-500 transition-colors"
+                className={`transition-colors ${
+                  isActiveRoute('/') && !isActiveRoute('/admin')
+                    ? 'text-orange-500 font-medium' 
+                    : 'text-gray-700 hover:text-orange-500'
+                }`}
                 onClick={() => setIsMenuOpen(false)}
               >
                 Menu
               </Link>
               <Link
                 to="/orders"
-                className="text-gray-700 hover:text-orange-500 transition-colors"
+                className={`transition-colors ${
+                  isActiveRoute('/orders') 
+                    ? 'text-orange-500 font-medium' 
+                    : 'text-gray-700 hover:text-orange-500'
+                }`}
                 onClick={() => setIsMenuOpen(false)}
               >
                 My Orders
               </Link>
               <Link
                 to="/wishlist"
-                className="text-gray-700 hover:text-orange-500 transition-colors"
+                className={`transition-colors ${
+                  isActiveRoute('/wishlist') 
+                    ? 'text-orange-500 font-medium' 
+                    : 'text-gray-700 hover:text-orange-500'
+                }`}
                 onClick={() => setIsMenuOpen(false)}
               >
                 Wishlist
@@ -274,7 +341,11 @@ const Header: React.FC = () => {
               {user?.isAdmin && (
                 <Link
                   to="/admin"
-                  className="text-gray-700 hover:text-orange-500 transition-colors"
+                  className={`transition-colors ${
+                    isActiveRoute('/admin') 
+                      ? 'text-orange-500 font-medium' 
+                      : 'text-gray-700 hover:text-orange-500'
+                  }`}
                   onClick={() => setIsMenuOpen(false)}
                 >
                   Admin Panel
